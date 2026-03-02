@@ -694,7 +694,7 @@
     setLoading('btn-login','sp-login','btn-login-txt',true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/login',{
+      const res = await fetch('https://rizk-bank.onrender.com',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({email, password:pass, card: card.replace(/\s/g,'')})
       });
@@ -731,7 +731,7 @@
     setLoading('btn-reg','sp-reg','btn-reg-txt',true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/register',{
+      const res = await fetch('https://rizk-bank.onrender.com',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({firstname:fn,lastname:ln,email,phone,card:card.replace(/\s/g,''),password:pass})
       });
