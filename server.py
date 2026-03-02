@@ -9,7 +9,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
-
+import os
 app = Flask(__name__)
 CORS(app)  # Allow requests from your HTML frontend
 
@@ -256,4 +256,5 @@ if __name__ == "__main__":
     print(f"\n🏦 RIZK Banque API running on http://localhost:{CONFIG['PORT']}")
     print("   POST /api/register")
     print("   POST /api/login\n")
-    app.run(port=CONFIG["PORT"], debug=True)
+ 
+app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3000)), debug=False)
