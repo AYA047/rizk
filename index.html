@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIZK BANK – Virement & Transfert d'Argent</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0b1f3a;
+    --navy-mid: #122849;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --white: #ffffff;
+    --off-white: #f5f3ee;
+    --text: #2c2c2c;
+    --text-light: #5a5a5a;
+    --border: #ddd8cc;
+    --error: #c0392b;
+    --success: #27ae60;
+  }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    background: var(--off-white);
+    color: var(--text);
+    overflow: hidden;
+  }
+  body.unlocked { overflow: auto; }
+
+  /* ════════════════════════════════
+     AUTH OVERLAY
+  ════════════════════════════════ */
+  #auth-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(7,16,30,0.93);
+    backdrop-filter: blur(7px);
+    padding: 20px;
+    transition: opacity 0.5s ease;
+  }
+  #auth-overlay.hiding { opacity: 0; pointer-events: none; }
+  #auth-overlay::before {
+    content:''; position:absolute;
+    width:600px; height:600px; border-radius:50%;
+    border:60px solid rgba(201,168,76,0.04);
+    top:-150px; right:-150px; pointer-events:none;
+  }
+  #auth-overlay::after {
+    content:''; position:absolute;
+    width:400px; height:400px; border-radius:50%;
+    border:40px solid rgba(201,168,76,0.03);
+    bottom:-100px; left:-100px; pointer-events:none;
+  }
+
+  .auth-box {
+    width:100%; max-width:460px;
+    position:relative; z-index:1;
+    animation: modalIn 0.45s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes modalIn {
+    from { opacity:0; transform:translateY(28px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+  }
+
+  .auth-brand {
+    display:flex; align-items:center; justify-content:center;
+    gap:12px; margin-bottom:20px;
+  }
+  .auth-logo-mark {
+    width:48px; height:48px; background:var(--gold); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:var(--navy);
+  }
+  .auth-brand-name {
+    font-family:'Playfair Display',serif; font-size:20px; font-weight:700;
+    color:var(--white); letter-spacing:3px; display:block;
+  }
+  .auth-brand-tag {
+    font-size:9px; color:rgba(201,168,76,0.7);
+    letter-spacing:2px; text-transform:uppercase; display:block;
+  }
+
+  .auth-tabs { display:flex; border-bottom:2px solid rgba(201,168,76,0.2); }
+  .auth-tab {
+    flex:1; background:rgba(255,255,255,0.04); border:none; padding:14px;
+    font-family:'Source Sans 3',sans-serif; font-size:12px; font-weight:700;
+    letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.35);
+    cursor:pointer; transition:all 0.25s; border-bottom:2px solid transparent; margin-bottom:-2px;
+  }
+  .auth-tab.active { color:var(--gold); border-bottom-color:var(--gold); background:rgba(201,168,76,0.06); }
+
+  .auth-card { background:var(--white); padding:36px 40px 32px; border-top:4px solid var(--gold); }
+  .auth-card-title { font-family:'Playfair Display',serif; font-size:21px; color:var(--navy); margin-bottom:4px; }
+  .auth-card-sub { font-size:13px; color:var(--text-light); margin-bottom:24px; line-height:1.55; }
+
+  .form-group { margin-bottom:15px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .auth-card label {
+    display:block; font-size:11px; font-weight:700;
+    letter-spacing:0.8px; text-transform:uppercase; color:var(--navy); margin-bottom:5px;
+  }
+  .auth-card input {
+    width:100%; padding:10px 13px; border:1.5px solid var(--border); border-radius:2px;
+    font-family:'Source Sans 3',sans-serif; font-size:14px; color:var(--text);
+    background:#fdfcfa; outline:none; transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .auth-card input:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,168,76,0.12); }
+  .auth-card input.err { border-color:var(--error); }
+  .field-err { font-size:11px; color:var(--error); margin-top:3px; display:none; }
+
+  .divider { height:1px; background:var(--border); margin:18px 0; }
+
+  .btn-auth {
+    width:100%; background:var(--navy); color:var(--gold); border:none; padding:13px;
+    font-family:'Source Sans 3',sans-serif; font-size:12px; font-weight:700;
+    letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; border-radius:2px;
+    transition:background 0.2s,color 0.2s; margin-top:6px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn-auth:hover { background:var(--gold); color:var(--navy); }
+  .btn-auth:disabled { opacity:0.6; cursor:not-allowed; }
+
+  .spinner {
+    width:15px; height:15px; border:2px solid rgba(201,168,76,0.3);
+    border-top-color:var(--gold); border-radius:50%;
+    animation:spin 0.7s linear infinite; display:none;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .forgot { text-align:right; margin-top:5px; }
+  .forgot a { font-size:11.5px; color:var(--text-light); text-decoration:none; }
+  .forgot a:hover { color:var(--navy); }
+
+  .auth-alert {
+    padding:10px 14px; border-radius:2px; font-size:13px;
+    margin-bottom:16px; display:none; line-height:1.5;
+  }
+  .auth-alert.success { background:#eafaf1; border-left:4px solid var(--success); color:#1e8449; }
+  .auth-alert.error   { background:#fdf0ee; border-left:4px solid var(--error);   color:var(--error); }
+
+  .auth-panel { display:none; }
+  .auth-panel.active { display:block; }
+
+  .sec-note {
+    display:flex; align-items:center; gap:7px;
+    margin-top:16px; padding-top:14px;
+    border-top:1px solid var(--border);
+    font-size:11px; color:var(--text-light);
+  }
+
+  /* ════════════════════════════════
+     SITE (blurred gate)
+  ════════════════════════════════ */
+  #site-content {
+    filter:blur(4px);
+    pointer-events:none; user-select:none;
+    transition:filter 0.6s ease;
+  }
+  #site-content.revealed { filter:none; pointer-events:auto; user-select:auto; }
+
+  /* HEADER */
+  header { background:var(--navy); padding:0 40px; }
+  .header-top {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 0; border-bottom:1px solid rgba(201,168,76,0.25);
+  }
+  .logo { display:flex; align-items:center; gap:14px; text-decoration:none; }
+  .logo-mark {
+    width:52px; height:52px; background:var(--gold); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:var(--navy); flex-shrink:0;
+  }
+  .logo-name { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:var(--white); letter-spacing:3px; }
+  .logo-tagline { font-size:10px; color:var(--gold-light); letter-spacing:2px; text-transform:uppercase; font-weight:300; }
+  .header-actions { display:flex; gap:16px; align-items:center; }
+  .header-actions > a {
+    color:rgba(255,255,255,0.75); font-size:13px;
+    text-decoration:none; letter-spacing:0.5px; transition:color 0.2s;
+  }
+  .header-actions > a:hover { color:var(--gold-light); }
+
+  .user-badge {
+    display:none; align-items:center; gap:8px;
+    background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.3);
+    padding:6px 14px; border-radius:2px;
+  }
+  .user-badge.visible { display:flex; }
+  .user-badge span { font-size:12px; font-weight:600; color:var(--gold); letter-spacing:0.5px; }
+  .btn-logout {
+    background:none; border:none; font-size:11px; color:rgba(255,255,255,0.4);
+    cursor:pointer; font-family:'Source Sans 3',sans-serif;
+    letter-spacing:0.5px; transition:color 0.2s; text-transform:uppercase;
+  }
+  .btn-logout:hover { color:var(--error); }
+
+  .btn-login-header {
+    background:var(--gold); color:var(--navy) !important;
+    padding:8px 20px; border-radius:2px; font-weight:600 !important;
+    font-size:12px !important; letter-spacing:1px !important; text-transform:uppercase;
+    transition:background 0.2s !important;
+  }
+  .btn-login-header:hover { background:var(--gold-light) !important; }
+
+  /* NAV */
+  nav { background:var(--navy-mid); }
+  .nav-inner { max-width:1200px; margin:0 auto; padding:0 40px; display:flex; }
+  nav a {
+    color:rgba(255,255,255,0.82); text-decoration:none;
+    font-size:12.5px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+    padding:16px 20px; display:block;
+    transition:color 0.2s,border-bottom 0.2s; border-bottom:3px solid transparent;
+  }
+  nav a:hover { color:var(--gold-light); border-bottom-color:var(--gold); }
+  nav a.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  /* HERO */
+  .hero-strip {
+    background:linear-gradient(135deg,var(--navy) 0%,#1a3a5c 100%);
+    padding:36px 40px; position:relative; overflow:hidden;
+  }
+  .hero-strip::before {
+    content:''; position:absolute; right:-60px; top:-60px;
+    width:300px; height:300px; border-radius:50%; border:40px solid rgba(201,168,76,0.08);
+  }
+  .hero-strip::after {
+    content:''; position:absolute; right:80px; bottom:-80px;
+    width:200px; height:200px; border-radius:50%; border:30px solid rgba(201,168,76,0.05);
+  }
+  .hero-inner { max-width:1200px; margin:0 auto; position:relative; z-index:1; }
+  .breadcrumb { font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:0.5px; margin-bottom:10px; }
+  .breadcrumb span { color:var(--gold); }
+  .hero-strip h1 { font-family:'Playfair Display',serif; font-size:32px; color:var(--white); letter-spacing:2px; font-weight:700; }
+  .hero-strip h1 span { color:var(--gold); }
+  .gold-rule { width:80px; height:3px; background:var(--gold); margin-top:14px; }
+
+  /* PAGE BODY */
+  .page-body {
+    max-width:1200px; margin:0 auto; padding:40px;
+    display:grid; grid-template-columns:1fr 300px; gap:40px; align-items:start;
+  }
+
+  /* CONTENT */
+  .content {
+    background:var(--white); padding:44px 48px;
+    border-top:4px solid var(--gold); box-shadow:0 2px 16px rgba(0,0,0,0.06);
+  }
+  .section-lead { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+  .section-icon {
+    width:44px; height:44px; background:var(--navy); border-radius:2px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .section-title { font-family:'Playfair Display',serif; font-size:22px; color:var(--navy); font-weight:700; }
+  .content h3 {
+    font-size:14px; font-weight:600; color:var(--navy);
+    text-transform:uppercase; letter-spacing:1.5px;
+    margin:32px 0 12px; padding-left:14px; border-left:3px solid var(--gold);
+  }
+  .content p { font-size:15px; line-height:1.85; color:var(--text-light); margin-bottom:16px; }
+  .content p strong { color:var(--text); }
+
+  .steps { margin:20px 0; display:flex; flex-direction:column; gap:14px; }
+  .step { display:flex; gap:16px; align-items:flex-start; }
+  .step-num {
+    width:30px; height:30px; background:var(--navy); color:var(--gold);
+    font-weight:700; font-size:13px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px;
+  }
+  .step p { margin:0; }
+
+  .info-box {
+    background:#f0ede6; border-left:4px solid var(--gold);
+    padding:16px 20px; margin:24px 0; font-size:14px; color:var(--text); line-height:1.7;
+  }
+  .info-box strong { color:var(--navy); }
+
+  table { width:100%; border-collapse:collapse; margin:20px 0; font-size:14px; }
+  thead th { background:var(--navy); color:var(--gold); padding:12px 16px; text-align:left; font-weight:600; letter-spacing:0.5px; font-size:13px; }
+  tbody tr:nth-child(even) { background:#f9f7f3; }
+  tbody tr:nth-child(odd)  { background:var(--white); }
+  tbody td { padding:11px 16px; border-bottom:1px solid var(--border); color:var(--text-light); }
+  tbody td:first-child { font-weight:600; color:var(--text); }
+
+  /* SIDEBAR */
+  .sidebar { display:flex; flex-direction:column; gap:20px; }
+  .sidebar-card { background:var(--white); box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .sidebar-card-header {
+    background:var(--navy); padding:14px 20px; font-size:11px;
+    font-weight:700; color:var(--gold); letter-spacing:2px; text-transform:uppercase;
+  }
+  .sidebar-card ul { list-style:none; padding:8px 0; }
+  .sidebar-card ul li a {
+    display:flex; align-items:center; gap:10px; padding:11px 20px;
+    font-size:13.5px; color:var(--text); text-decoration:none;
+    border-bottom:1px solid var(--border); transition:background 0.15s,color 0.15s;
+  }
+  .sidebar-card ul li:last-child a { border-bottom:none; }
+  .sidebar-card ul li a:hover { background:var(--off-white); color:var(--navy); }
+  .sidebar-card ul li a::before { content:''; width:5px; height:5px; background:var(--gold); border-radius:50%; flex-shrink:0; }
+
+  .contact-card { background:var(--navy); padding:24px 20px; text-align:center; }
+  .contact-card h4 { font-family:'Playfair Display',serif; color:var(--white); font-size:16px; margin-bottom:8px; }
+  .contact-card p { color:rgba(255,255,255,0.6); font-size:13px; margin-bottom:16px; }
+  .phone-num { font-size:22px; font-weight:700; color:var(--gold); letter-spacing:1px; display:block; margin-bottom:16px; font-family:'Playfair Display',serif; }
+  .btn-contact {
+    display:block; background:var(--gold); color:var(--navy);
+    text-decoration:none; padding:10px; font-weight:700;
+    font-size:12px; letter-spacing:1px; text-transform:uppercase;
+    transition:background 0.2s; border-radius:2px;
+  }
+  .btn-contact:hover { background:var(--gold-light); }
+
+  /* FOOTER */
+  footer { background:var(--navy); padding:24px 40px; margin-top:40px; }
+  .footer-inner { max-width:1200px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; }
+  footer p { color:rgba(255,255,255,0.4); font-size:12px; letter-spacing:0.5px; }
+  footer p span { color:var(--gold); }
+  .footer-links { display:flex; gap:24px; }
+  .footer-links a { color:rgba(255,255,255,0.4); font-size:12px; text-decoration:none; transition:color 0.2s; }
+  .footer-links a:hover { color:var(--gold); }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);} }
+  .content,.sidebar-card,.contact-card { animation:fadeUp 0.5s ease both; }
+  .sidebar-card:nth-child(2){animation-delay:0.1s;}
+  .sidebar-card:nth-child(3){animation-delay:0.2s;}
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH OVERLAY ══ -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <div class="auth-brand">
+      <div class="auth-logo-mark">R</div>
+      <div>
+        <span class="auth-brand-name">RIZK</span>
+        <span class="auth-brand-tag">Banque · Finance · Avenir</span>
+      </div>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="authTab('login')">Connexion</button>
+      <button class="auth-tab" onclick="authTab('register')">Inscription</button>
+    </div>
+
+    <div class="auth-card">
+
+      <!-- LOGIN -->
+      <div id="ap-login" class="auth-panel active">
+        <h2 class="auth-card-title">Bon retour</h2>
+        <p class="auth-card-sub">Connectez-vous pour accéder à vos services RIZK.</p>
+        <div id="login-alert" class="auth-alert"></div>
+
+        <div class="form-group">
+          <label for="l-card">Numéro de carte bancaire</label>
+          <div style="position:relative;">
+            <input type="text" id="l-card" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric" autocomplete="cc-number" style="padding-right:48px;">
+            <span id="card-brand-icon" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;">💳</span>
+          </div>
+          <p class="field-err" id="l-card-err">Numéro de carte invalide (16 chiffres requis).</p>
+        </div>
+        <div class="form-group">
+          <label for="l-email">Adresse e-mail</label>
+          <input type="email" id="l-email" placeholder="exemple@email.com">
+          <p class="field-err" id="l-email-err">E-mail invalide.</p>
+        </div>
+        <div class="form-group">
+          <label for="l-pass">Mot de passe</label>
+          <input type="password" id="l-pass" placeholder="••••••••">
+          <p class="field-err" id="l-pass-err">Champ requis.</p>
+        </div>
+        <div class="forgot"><a href="#">Mot de passe oublié ?</a></div>
+
+        <button class="btn-auth" id="btn-login" onclick="doLogin()">
+          <span id="btn-login-txt">Se connecter</span>
+          <div class="spinner" id="sp-login"></div>
+        </button>
+        <div class="sec-note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Connexion sécurisée — SSL 256 bits
+        </div>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="ap-register" class="auth-panel">
+        <h2 class="auth-card-title">Créer un compte</h2>
+        <p class="auth-card-sub">Rejoignez RIZK Banque. Un e-mail de confirmation vous sera envoyé.</p>
+        <div id="register-alert" class="auth-alert"></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="r-fn">Prénom</label>
+            <input type="text" id="r-fn" placeholder="Amine">
+            <p class="field-err" id="r-fn-err">Requis.</p>
+          </div>
+          <div class="form-group">
+            <label for="r-ln">Nom</label>
+            <input type="text" id="r-ln" placeholder="Benali">
+            <p class="field-err" id="r-ln-err">Requis.</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="r-email">Adresse e-mail</label>
+          <input type="email" id="r-email" placeholder="exemple@email.com">
+          <p class="field-err" id="r-email-err">E-mail invalide.</p>
+        </div>
+        <div class="form-group">
+          <label for="r-phone">Téléphone</label>
+          <input type="tel" id="r-phone" placeholder="0770 000 000">
+          <p class="field-err" id="r-phone-err">Requis.</p>
+        </div>
+        <div class="form-group">
+          <label for="r-card">Numéro de carte bancaire</label>
+          <div style="position:relative;">
+            <input type="text" id="r-card" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric" autocomplete="cc-number" style="padding-right:48px;">
+            <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;">💳</span>
+          </div>
+          <p class="field-err" id="r-card-err">Numéro de carte invalide (16 chiffres requis).</p>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label for="r-pass">Mot de passe</label>
+          <input type="password" id="r-pass" placeholder="Min. 8 caractères">
+          <p class="field-err" id="r-pass-err">Min. 8 caractères.</p>
+        </div>
+        <div class="form-group">
+          <label for="r-conf">Confirmer</label>
+          <input type="password" id="r-conf" placeholder="Répéter le mot de passe">
+          <p class="field-err" id="r-conf-err">Les mots de passe ne correspondent pas.</p>
+        </div>
+
+        <button class="btn-auth" id="btn-reg" onclick="doRegister()">
+          <span id="btn-reg-txt">Créer mon compte</span>
+          <div class="spinner" id="sp-reg"></div>
+        </button>
+        <div class="sec-note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Un e-mail récapitulatif sera envoyé après inscription.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ SITE CONTENT ══ -->
+<div id="site-content">
+
+<header>
+  <div class="header-top" style="max-width:1200px;margin:0 auto;">
+    <a href="#" class="logo">
+      <div class="logo-mark">R</div>
+      <div>
+        <span class="logo-name">RIZK</span>
+        <span class="logo-tagline">Banque · Finance · Avenir</span>
+      </div>
+    </a>
+    <div class="header-actions">
+      <a href="#">Agences</a>
+      <a href="#">Simulateur</a>
+      <a href="#">Contact</a>
+      <div class="user-badge" id="user-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c9a84c" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span id="user-name">Client</span>
+        <button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+      </div>
+      <a href="#" id="btn-reopen" class="btn-login-header" style="display:none;" onclick="reopenAuth(event)">Connexion</a>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#">Actualités</a>
+    <a href="#">Particuliers</a>
+    <a href="#" class="active">Services Corporate</a>
+    <a href="#">Épargne & Placement</a>
+    <a href="#">Crédits</a>
+    <a href="#">Avis & Appels d'offres</a>
+  </div>
+</nav>
+
+<div class="hero-strip">
+  <div class="hero-inner">
+    <p class="breadcrumb">Accueil › Services Corporate › <span>Virement & Transfert d'Argent</span></p>
+    <h1>Virement & <span>Transfert d'Argent</span></h1>
+    <div class="gold-rule"></div>
+  </div>
+</div>
+
+<div class="page-body">
+  <main class="content">
+    <div class="section-lead">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M2 12h18M15 7l5 5-5 5M7 7L2 12l5 5" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </div>
+      <h2 class="section-title">Service de Virement & Transfert</h2>
+    </div>
+
+    <h3>Découvrez le service</h3>
+    <p>RIZK Banque met à votre disposition un service de <strong>virement et de transfert d'argent</strong> rapide, sécurisé et disponible 24h/24 et 7j/7. Que vous souhaitiez effectuer un virement national ou un transfert international, notre plateforme vous garantit des opérations fluides et traçables en temps réel.</p>
+    <p>Grâce à notre réseau de partenaires agréés et à notre infrastructure bancaire certifiée, chaque transaction bénéficie des plus hauts standards de sécurité et de conformité réglementaire.</p>
+
+    <h3>Comment bénéficier de ce service ?</h3>
+    <p>Ce service est disponible pour tous les titulaires d'un compte bancaire RIZK actif. Voici comment procéder :</p>
+
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><p>Connectez-vous à votre <strong>Espace Client en ligne</strong> sur <strong>www.rizk-banque.dz</strong> ou rendez-vous directement en agence.</p></div>
+      <div class="step"><div class="step-num">2</div><p>Sélectionnez <strong>"Effectuer un virement"</strong> depuis votre tableau de bord et renseignez les informations du bénéficiaire (RIB, IBAN ou numéro de compte).</p></div>
+      <div class="step"><div class="step-num">3</div><p>Indiquez le montant, la devise et la date d'exécution souhaitée. Confirmez l'opération via votre <strong>code OTP</strong> reçu par SMS.</p></div>
+      <div class="step"><div class="step-num">4</div><p>Un <strong>accusé de réception</strong> vous est immédiatement envoyé par email et SMS. Vous pouvez suivre l'état de votre virement en temps réel.</p></div>
+    </div>
+
+    <div class="info-box">
+      <strong>Bon à savoir :</strong> Pour les virements internationaux, veuillez prévoir votre <strong>pièce d'identité</strong> et justificatif de l'objet du transfert (facture, contrat, etc.) conformément à la réglementation des changes en vigueur.
+    </div>
+
+    <h3>Types de virements disponibles</h3>
+    <table>
+      <thead><tr><th>Type d'opération</th><th>Délai d'exécution</th><th>Disponibilité</th></tr></thead>
+      <tbody>
+        <tr><td>Virement compte à compte RIZK</td><td>Instantané</td><td>24h/24 – 7j/7</td></tr>
+        <tr><td>Virement interbancaire national</td><td>J+1 ouvré</td><td>Jours ouvrés</td></tr>
+        <tr><td>Virement SEPA (Zone Euro)</td><td>1 à 2 jours ouvrés</td><td>Jours ouvrés</td></tr>
+        <tr><td>Transfert international (SWIFT)</td><td>2 à 5 jours ouvrés</td><td>Sur demande en agence</td></tr>
+        <tr><td>Virement programmé / récurrent</td><td>Selon planification</td><td>24h/24 – 7j/7</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Sécurité & Conformité</h3>
+    <p>Tous nos virements sont protégés par un <strong>système d'authentification forte (2FA)</strong> et font l'objet d'une surveillance anti-fraude en temps réel. RIZK Banque est conforme aux exigences de la Banque d'Algérie et aux normes internationales en matière de lutte contre le blanchiment d'argent (LCB-FT).</p>
+    <p>En cas d'anomalie ou de transaction suspecte, notre équipe sécurité est habilitée à bloquer immédiatement l'opération et à vous contacter dans les plus brefs délais.</p>
+  </main>
+
+  <aside class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">Autres Services</div>
+      <ul>
+        <li><a href="#">Ouverture de compte courant</a></li>
+        <li><a href="#">Carte bancaire RIZK Gold</a></li>
+        <li><a href="#">Épargne & Dépôts à terme</a></li>
+        <li><a href="#">Crédit immobilier</a></li>
+        <li><a href="#">Crédit à la consommation</a></li>
+        <li><a href="#">Assurance bancaire</a></li>
+        <li><a href="#">Banque en ligne (E-banking)</a></li>
+        <li><a href="#">Change & Devises</a></li>
+      </ul>
+    </div>
+    <div class="contact-card">
+      <h4>Besoin d'aide ?</h4>
+      <p>Notre service clientèle est disponible du dimanche au jeudi, de 8h à 17h.</p>
+      <span class="phone-num">3030</span>
+      <a href="#" class="btn-contact">Nous contacter</a>
+    </div>
+    <div class="sidebar-card">
+      <div class="sidebar-card-header">Documents Utiles</div>
+      <ul>
+        <li><a href="#">Formulaire de virement</a></li>
+        <li><a href="#">Tarifs & Commissions 2025</a></li>
+        <li><a href="#">Guide d'utilisation E-banking</a></li>
+        <li><a href="#">Conditions Générales</a></li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <p>© 2025 <span>RIZK Banque</span>. Tous droits réservés. Agrément Banque d'Algérie N° 001-B.</p>
+    <div class="footer-links">
+      <a href="#">Mentions légales</a>
+      <a href="#">Confidentialité</a>
+      <a href="#">Accessibilité</a>
+      <a href="#">Plan du site</a>
+    </div>
+  </div>
+</footer>
+</div><!-- /site-content -->
+
+<script>
+  const users = [];
+  let currentUser = null;
+
+  const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  const isValidCard = c => c.replace(/\s/g,'').length === 16;
+
+  // Card number formatting: auto-spaces every 4 digits + brand icon
+  document.addEventListener('DOMContentLoaded', () => {
+    const cardInput = document.getElementById('l-card');
+    const brandIcon = document.getElementById('card-brand-icon');
+    if (!cardInput) return;
+
+    cardInput.addEventListener('input', function(e) {
+      let val = this.value.replace(/\D/g,'').substring(0,16);
+      // Format with spaces every 4 digits
+      this.value = val.replace(/(.{4})/g,'$1 ').trim();
+
+      // Detect card brand from first digits
+      const first = val.substring(0,2);
+      const first4 = val.substring(0,4);
+      if (val.startsWith('4')) brandIcon.textContent = '💳'; // Visa (could use V)
+      else if (['51','52','53','54','55'].includes(first)) brandIcon.textContent = '💳'; // Mastercard
+      else if (['34','37'].includes(first)) brandIcon.textContent = '💳'; // Amex
+      else brandIcon.textContent = '💳';
+
+      // Remove error on input
+      if (isValidCard(this.value)) ferr('l-card','l-card-err',false);
+    });
+
+    // Card formatting for register form
+    const regCardInput = document.getElementById('r-card');
+    if (regCardInput) {
+      regCardInput.addEventListener('input', function() {
+        let val = this.value.replace(/\D/g,'').substring(0,16);
+        this.value = val.replace(/(.{4})/g,'$1 ').trim();
+        if (isValidCard(this.value)) ferr('r-card','r-card-err',false);
+      });
+    }
+  });
+
+  function showAlert(id, type, msg) {
+    const el = document.getElementById(id);
+    el.className = 'auth-alert ' + type;
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function hideAlert(id) { document.getElementById(id).style.display = 'none'; }
+
+  function setLoading(btnId, spId, txtId, on) {
+    document.getElementById(btnId).disabled = on;
+    document.getElementById(spId).style.display = on ? 'block' : 'none';
+    document.getElementById(txtId).style.display = on ? 'none' : 'inline';
+  }
+
+  function ferr(inputId, errId, show) {
+    document.getElementById(inputId).classList.toggle('err', show);
+    document.getElementById(errId).style.display = show ? 'block' : 'none';
+  }
+
+  function authTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach((b,i) =>
+      b.classList.toggle('active',(i===0&&tab==='login')||(i===1&&tab==='register'))
+    );
+    document.getElementById('ap-login').classList.toggle('active', tab==='login');
+    document.getElementById('ap-register').classList.toggle('active', tab==='register');
+  }
+
+  function unlockSite(user) {
+    currentUser = user;
+    const overlay = document.getElementById('auth-overlay');
+    overlay.classList.add('hiding');
+    setTimeout(() => overlay.style.display = 'none', 500);
+    const site = document.getElementById('site-content');
+    site.classList.add('revealed');
+    document.body.classList.add('unlocked');
+    document.getElementById('user-name').textContent = user.firstname + ' ' + user.lastname;
+    document.getElementById('user-badge').classList.add('visible');
+    document.getElementById('btn-reopen').style.display = 'none';
+  }
+
+  function doLogout() {
+    currentUser = null;
+    document.getElementById('user-badge').classList.remove('visible');
+    document.getElementById('btn-reopen').style.display = 'inline-block';
+    document.getElementById('site-content').classList.remove('revealed');
+    document.body.classList.remove('unlocked');
+    const overlay = document.getElementById('auth-overlay');
+    overlay.style.display = 'flex';
+    overlay.classList.remove('hiding');
+    authTab('login');
+    hideAlert('login-alert');
+  }
+
+  function reopenAuth(e) {
+    e.preventDefault();
+    const overlay = document.getElementById('auth-overlay');
+    overlay.style.display = 'flex';
+    overlay.classList.remove('hiding');
+    document.body.classList.remove('unlocked');
+  }
+
+  async function doLogin() {
+    const card  = document.getElementById('l-card').value.trim();
+    const email = document.getElementById('l-email').value.trim();
+    const pass  = document.getElementById('l-pass').value;
+    ferr('l-card','l-card-err',!isValidCard(card));
+    ferr('l-email','l-email-err',!isEmail(email));
+    ferr('l-pass','l-pass-err',!pass);
+    if (!isValidCard(card)||!isEmail(email)||!pass) return;
+
+    hideAlert('login-alert');
+    setLoading('btn-login','sp-login','btn-login-txt',true);
+
+    try {
+      const res = await fetch('http://localhost:3000/api/login',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({email, password:pass, card: card.replace(/\s/g,'')})
+      });
+      const data = await res.json();
+      if (res.ok) { unlockSite(data.user); }
+      else { showAlert('login-alert','error', data.message||'Identifiants incorrects.'); }
+    } catch {
+      // Demo fallback when server not running
+      const user = users.find(u => u.email===email && u.password===pass);
+      if (user) { unlockSite(user); }
+      else { showAlert('login-alert','error','Identifiants incorrects. (Mode démo : créez d\'abord un compte)'); }
+    }
+    setLoading('btn-login','sp-login','btn-login-txt',false);
+  }
+
+  async function doRegister() {
+    const fn    = document.getElementById('r-fn').value.trim();
+    const ln    = document.getElementById('r-ln').value.trim();
+    const email = document.getElementById('r-email').value.trim();
+    const phone = document.getElementById('r-phone').value.trim();
+    const card  = document.getElementById('r-card').value.trim();
+    const pass  = document.getElementById('r-pass').value;
+    const conf  = document.getElementById('r-conf').value;
+
+    let ok = true;
+    [[fn,'r-fn','r-fn-err'],[ln,'r-ln','r-ln-err'],[phone,'r-phone','r-phone-err']].forEach(([v,i,e])=>{\n      ferr(i,e,!v); if(!v) ok=false;\n    });
+    ferr('r-email','r-email-err',!isEmail(email)); if(!isEmail(email)) ok=false;
+    ferr('r-card','r-card-err',!isValidCard(card)); if(!isValidCard(card)) ok=false;
+    ferr('r-pass','r-pass-err',pass.length<8); if(pass.length<8) ok=false;
+    ferr('r-conf','r-conf-err',pass!==conf); if(pass!==conf) ok=false;
+    if(!ok) return;
+
+    hideAlert('register-alert');
+    setLoading('btn-reg','sp-reg','btn-reg-txt',true);
+
+    try {
+      const res = await fetch('http://localhost:3000/api/register',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({firstname:fn,lastname:ln,email,phone,card:card.replace(/\s/g,''),password:pass})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        users.push({firstname:fn,lastname:ln,email,phone,card:card.replace(/\s/g,''),password:pass});
+        showAlert('register-alert','success','✓ Compte créé ! Connectez-vous maintenant.');
+        document.querySelectorAll('#ap-register input').forEach(i=>i.value='');
+        setTimeout(()=>{ hideAlert('register-alert'); authTab('login'); },2500);
+      } else {
+        showAlert('register-alert','error',data.message||'Erreur lors de la création du compte.');
+      }
+    } catch {
+      if(users.find(u=>u.email===email)){
+        showAlert('register-alert','error','Un compte avec cet e-mail existe déjà.');
+      } else {
+        users.push({firstname:fn,lastname:ln,email,phone,card:card.replace(/\s/g,''),password:pass});
+        showAlert('register-alert','success','✓ Compte créé (mode démo). Connectez-vous maintenant.');
+        document.querySelectorAll('#ap-register input').forEach(i=>i.value='');
+        setTimeout(()=>{ hideAlert('register-alert'); authTab('login'); },2500);
+      }
+    }
+    setLoading('btn-reg','sp-reg','btn-reg-txt',false);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key!=='Enter'||document.getElementById('auth-overlay').style.display==='none') return;
+    document.getElementById('ap-login').classList.contains('active') ? doLogin() : doRegister();
+  });
+</script>
+</body>
+</html>
